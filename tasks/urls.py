@@ -1,5 +1,9 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+
+router = DefaultRouter()
+router.register(r'tasks-viewset', views.TaskViewSet, basename='task')
 
 urlpatterns = [
     path('tasks/', views.TaskListCreateView.as_view()),
@@ -12,4 +16,6 @@ urlpatterns = [
     path('login/', views.login_view),
     path('logout/', views.logout_view),
     path('check-auth/', views.check_auth),
+    
+    path('', include(router.urls)),
 ]
