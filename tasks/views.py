@@ -1,15 +1,53 @@
-from django.shortcuts import render
-from rest_framework import generics, permissions
-from rest_framework.views import APIView
+from rest_framework import viewsets, generics, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from rest_framework import status
 from django.db.models import Q
 from django.contrib.auth import authenticate, login, logout
 from .models import Task, User
 from .serializers import TaskSerializer, UserSerializer
+from .permissions import TaskPermission
 
+
+class TaskViewSet(viewsets.ModelViewSet):
+    serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated, TaskPermission]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'client':
+            return Task.objects.filter(created_by=user)
+        return Task.objects.all()
+    
+    def get_queryset(self):
+        user = self.request.user
+        tasks = Task.objects.all()
+        
+        if user.role == 'client':
+            tasks = tasks.filter(Q(created_by=user) | Q(assigned_to=user))
+        
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            tasks = tasks.filter(status=status_param)
+        
+        ordering = self.request.query_params.get('ordering', '-created_at')
+        if ordering in ['created_at', '-created_at']:
+            tasks = tasks.order_by(ordering)
+        
+        return tasks
+    
+    @action(detail=False, methods=['get'])
+    def my(self, request):
+        tasks = Task.objects.filter(
+            Q(created_by=request.user) | Q(assigned_to=request.user)
+        )
+        serializer = self.get_serializer(tasks, many=True)
+        return Response(serializer.data)
+    
+    def perform_create(self, serializer):
+        serializer.save()
 
 class TaskListCreateView(generics.ListCreateAPIView):
     serializer_class = TaskSerializer
@@ -38,19 +76,10 @@ class TaskListCreateView(generics.ListCreateAPIView):
 class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, TaskPermission]
     
     def check_object_permissions(self, request, obj):
         super().check_object_permissions(request, obj)
-        user = request.user
-        
-        if request.method == 'DELETE':
-            if user.role != 'admin':
-                self.permission_denied(request, 'Только админ может удалять')
-        
-        if user.role == 'client':
-            if obj.created_by != user and obj.assigned_to != user:
-                self.permission_denied(request, 'Это не ваша задача')
 
 class MyTasksView(generics.ListAPIView):
     serializer_class = TaskSerializer
@@ -111,6 +140,10 @@ def check_auth(request):
     if request.user.is_authenticated:
         return Response({
             'id': request.user.id,
+            'email': request.user.email,
+            'role': request.user.role
+        })
+    return Response({'error': 'Не авторизован'}, status=status.HTTP_401_UNAUTHORIZED)
             'email': request.user.email,
             'role': request.user.role
         })
