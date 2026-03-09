@@ -30,9 +30,9 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     
     ROLE_CHOICES = (
-        ('admin', 'Админ'),
-        ('moderator', 'Модератор'),
-        ('client', 'Клиент'),
+        ("admin", "Admin"),
+        ("moderator", "Moderator"),
+        ("client", "Client"),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='client')
     
@@ -45,20 +45,30 @@ class User(AbstractUser):
         return self.email
 
 class Task(models.Model):
-    # статусы задачи
     STATUS_CHOICES = (
-        ('new', 'Новая'),
-        ('approved', 'Одобрена'),
-        ('rejected', 'Отклонена'),
-        ('done', 'Готово'),
+        ("new", "New"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("done", "Done")
     )
     
     title = models.CharField(max_length=200)
     description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tasks')
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tasks')
+    
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='created_tasks'
+    )
+    assigned_to = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='assigned_tasks'
+    )
     
     def __str__(self):
         return self.title
